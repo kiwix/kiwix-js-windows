@@ -88,6 +88,7 @@ params['alphaChar'] = getSetting('alphaChar') || 'A'; //Set default start of alp
 params['omegaChar'] = getSetting('omegaChar') || 'Z'; //Set default end of alphabet string
 params['contentInjectionMode'] = getSetting('contentInjectionMode') || 'jquery'; // Defaults to jquery mode (widest compatibility)
 params['allowInternetAccess'] = getSetting('allowInternetAccess');
+params['rightClickOpensTab'] = getSetting('rightClickOpensTab') != null ? getSetting('rightClickOpensTab') : true; // A setting that determines whether right-click/long-press of a ZIM link opens a new window/tab
 
 //Do not touch these values unless you know what they do! Some are global variables, some are set programmatically
 params['imageDisplayMode'] = params.imageDisplay ? 'progressive' : 'manual';
@@ -113,6 +114,7 @@ params['falFileToken'] = "zimfile"; // UWP support
 params['falFolderToken'] = "zimfilestore"; // UWP support
 params.pagesLoaded = 0; // Page counter used to show PWA Install Prompt only after user has played with the app for a while
 params.localUWPSettings = /UWP/.test(params.appType) ? Windows.Storage.ApplicationData.current.localSettings.values : null;
+appstate['target'] = 'iframe'; // The target for article loads (this should always be 'iframe' initially, and will only be changed as a result of user action)
 
 // Apply any override parameters in querystring (done as a self-calling function to avoid creating global variables)
 (function overrideParams() {
@@ -212,6 +214,7 @@ document.getElementById('hideToolbarsCheck').checked = params.hideToolbars === t
 document.getElementById('hideToolbarsCheck').indeterminate = params.hideToolbars === "top";
 document.getElementById('hideToolbarsCheck').readOnly = params.hideToolbars === "top";
 document.getElementById('hideToolbarsState').innerHTML = (params.hideToolbars === "top" ? "top" : params.hideToolbars ? "both" : "never");
+document.getElementById('rightClickOpensTabCheck').checked = params.rightClickOpensTab;
 document.getElementById('allowInternetAccessCheck').checked = params.allowInternetAccess;
 // Howeever, if we're accessing the app from a server, add indication that we are online by default (user can turn off and will receive instructions)
 if (/^http/i.test(window.location.protocol) && params.allowInternetAccess === null) {

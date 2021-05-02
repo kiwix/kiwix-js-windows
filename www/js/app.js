@@ -1060,6 +1060,10 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             params.hideActiveContentWarning = this.checked ? true : false;
             settingsStore.setItem('hideActiveContentWarning', params.hideActiveContentWarning, Infinity);
         });
+        document.getElementById('rightClickOpensTabCheck').addEventListener('change', function (e) {
+            params.rightClickOpensTab = e.target.checked;
+            settingsStore.setItem('rightClickOpensTab', params.rightClickOpensTab, Infinity);
+        });
         $('input:checkbox[name=allowHTMLExtraction]').on('change', function (e) {
             params.allowHTMLExtraction = this.checked ? true : false;
             settingsStore.setItem('allowHTMLExtraction', params.allowHTMLExtraction, Infinity);
@@ -1834,21 +1838,20 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
 
 
         // Display the article when the user goes back in the browser history
-        window.onpopstate = function (event) {
+        var historyPop = function(event) {
             if (event.state) {
                 var title = event.state.title;
                 var titleSearch = event.state.titleSearch;
-
+                appstate.target = event.target.kiwixType;
+                // Select the correct window to which to write the popped history in case the user
+                // siwtches to a tab and navigates history without first clicking on a link
+                if (appstate.target === 'window') articleContainer = event.target;
                 $('#prefix').val("");
                 $("#welcomeText").hide();
-                if ($('#navbarToggle').is(":visible") && $('#liHomeNav').is(':visible')) {
-                    $('#navbarToggle').click();
-                }
                 $('#searchingArticles').hide();
                 $('#configuration').hide();
                 $('#articleListWithHeader').hide();
                 $('#articleContent').contents().empty();
-
                 if (title && !("" === title)) {
                     goToArticle(title);
                 }
@@ -1863,6 +1866,8 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             }
         };
 
+       window.onpopstate = historyPop;
+    
         /**
          * Populate the drop-down list of archives with the given list
          * @param {Array.<String>} archiveDirectories
@@ -2836,9 +2841,6 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             // Only update for expectedArticleURLToBeDisplayed.
             expectedArticleURLToBeDisplayed = dirEntry.namespace + "/" + dirEntry.url;
             params.pagesLoaded++;
-            
-            var iframe = document.getElementById('articleContent');
-                
             if (dirEntry.isRedirect()) {
                 appstate.selectedArchive.resolveRedirect(dirEntry, readArticle);
             } else {
@@ -2852,11 +2854,6 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
 
                 //Void the localSearch variable to prevent invalid DOM references remainining [kiwix-js-windows #56]
                 localSearch = {};
-
-                // Hide the display while loading
-                // iframeArticleContent.style.display = 'none';
-                // iframeArticleContent.onload = function(){};
-                // iframeArticleContent.src = 'article.html';
 
                 //Load cached start page if it exists and we have loaded the packaged file
                 var htmlContent = 0;
@@ -2872,10 +2869,10 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                             dirEntry.url = params.cachedStartPages[zimName].replace(/[AC]\//, '');
                             var title = htmlContent.match(/<title[^>]*>((?:[^<]|<(?!\/title))+)/);
                             dirEntry.title = title ? title[1] : dirEntry.title;
-                            displayArticleInForm(dirEntry, htmlContent);
+                            displayArticleContentInContainer(dirEntry, htmlContent);
                         } else {
                             document.getElementById('searchingArticles').style.display = 'block';
-                            appstate.selectedArchive.readUtf8File(dirEntry, displayArticleInForm);
+                            appstate.selectedArchive.readUtf8File(dirEntry, displayArticleContentInContainer);
                         }
                     });
                 }
@@ -2888,12 +2885,12 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                         if (/<html[^>]*>/.test(html)) {
                             console.log("Fast article retrieval from localStorage: " + lastPage);
                             setTimeout(function () {
-                                displayArticleInForm(dirEntry, html);
+                                displayArticleContentInContainer(dirEntry, html);
                             }, 10);
                         } else {
                             //if (params.contentInjectionMode === 'jquery') {
                             // In jQuery mode, we read the article content in the backend and manually insert it in the iframe
-                            appstate.selectedArchive.readUtf8File(dirEntry, displayArticleInForm);
+                            appstate.selectedArchive.readUtf8File(dirEntry, displayArticleContentInContainer);
                             // This is needed so that the html is cached in displayArticleInForm
                             params.lastPageVisit = '';
                             params.lastPageHTML = '';
@@ -2921,16 +2918,20 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             }
 
             if (params.contentInjectionMode === 'serviceworker') {
-                // In ServiceWorker mode, we simply set the iframe src.
+                // In ServiceWorker mode, we simply set the iframe or window src.
                 // (reading the backend is handled by the ServiceWorker itself)
                 // var iframe = document.getElementById('articleContent');
-                iframe.onload = function () {
+                var articleWindow = appstate.target === 'iframe' ? document.getElementById('articleContent') : window;
+                articleWindow.onload = function () {
+                    var articleContainer = articleWindow.contentWindow || articleWindow;
                     // Deflect drag-and-drop of ZIM file on the iframe to Config
-                    var doc = iframe ? iframe.contentDocument : null;
+                    var doc = articleContainer.document.documentElement;
                     var docBody = doc ? doc.body : null;
                     if (docBody) {
-                        docBody.addEventListener('dragover', handleIframeDragover);
-                        docBody.addEventListener('drop', handleIframeDrop);
+                        if (appstate.target === 'iframe') {
+                            docBody.addEventListener('dragover', handleIframeDragover);
+                            docBody.addEventListener('drop', handleIframeDrop);
+                        }
                         //Set relative font size + Stackexchange-family multiplier
                         var zimType = /-\/s\/style\.css/i.test(doc.head.innerHTML) ? "desktop" : "mobile";
                         zimType = /-\/static\/main\.css/i.test(doc.head.innerHTML) ? "desktop-stx" : zimType; //Support stackexchange
@@ -2956,16 +2957,10 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                         uiUtil.insertBreakoutLink(determinedTheme);
                     }
                     settingsStore.removeItem('lastPageLoad');
-                    // if (!~decodeURIComponent(params.lastPageVisit).indexOf(dirEntry.url)) {
-                    //     params.lastPageVisit = encodeURIComponent(dirEntry.namespace + "/" + dirEntry.url) +
-                    //         "@kiwixKey@" + appstate.selectedArchive._file._files[0].name;
-                    //     if (params.rememberLastPage) {
-                    //         settingsStore.setItem('lastPageVisit', params.lastPageVisit, Infinity);
-                    //     }
-                    // }
-
+                    $("#searchingArticles").hide();
+                    
                     // Show spinner when the article unloads
-                    if (iframe.contentWindow) iframe.contentWindow.onunload = function () {
+                    articleWindow.onunload = function () {
                         $("#searchingArticles").show();
                     };
 
@@ -3118,15 +3113,17 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
         //var cssDirEntryCache = new Map(); //This one is never hit!
         var cssBlobCache = new Map();
 
+        // Placeholders for the article container and the documentElement of the article
+        var articleContainer, articleDocument;
+
         /**
          * Display the the given HTML article in the web page,
          * and convert links to javascript calls
          * NB : in some error cases, the given title can be null, and the htmlArticle contains the error message
-         *
-         * @param {DirEntry} dirEntry
-         * @param {String} htmlArticle
+         * @param {DirEntry} dirEntry The Directory Entry of the article
+         * @param {String} htmlArticle The decoded HTML of the article
          */
-        function displayArticleInForm(dirEntry, htmlArticle) {
+        function displayArticleContentInContainer(dirEntry, htmlArticle) {
             //if (! isDirEntryExpectedToBeDisplayed(dirEntry)) {
             //    return;
             //}		
@@ -3459,35 +3456,13 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 // Extract any css classes from the html tag (they will be stripped when injected in iframe with .innerHTML)
                 if (params.contentInjectionMode === 'jquery') var htmlCSS = htmlArticle.match(/<html[^>]*class\s*=\s*["']\s*([^"']+)/i);
                 htmlCSS = htmlCSS ? htmlCSS[1] : '';
-                // Tell jQuery we're removing the iframe document: clears jQuery cache and prevents memory leaks [kiwix-js #361]
-                $('#articleContent').contents().remove();
 
-                // Remove from DOM any download alert box that was activated in uiUtil.displayFileDownloadAlert function
+                // Hide any alert box that was activated in uiUtil.displayFileDownloadAlert function
                 $('#downloadAlert').hide();
 
-                var iframeArticleContent = document.getElementById('articleContent');
-
-                // Hide the iframe while loading
-                iframeArticleContent.style.display = 'none';
-
-                if (params.contentInjectionMode === 'serviceworker') {
-                    // Add doctype if missing so that scripts run in standards mode 
-                    // (quirks mode prevents katex from running, and is incompatible with jQuery)
-                    params.transformedHTML = !/^\s*(?:<!DOCTYPE|<\?xml)\s+/i.test(htmlArticle) ? '<!DOCTYPE html>\n' + htmlArticle : htmlArticle;
-                    // We will need the encoded URL on article load so that we can set the iframe's src correctly,
-                    // but we must not encode the '/' character or else relative links may fail [kiwix-js #498]
-                    var encodedUrl = dirEntry.url.replace(/[^/]+/g, function (matchedSubstring) {
-                        return encodeURIComponent(matchedSubstring);
-                    });
-                    // We put the ZIM filename as a prefix in the URL, so that browser caches are separate for each ZIM file
-                    iframeArticleContent.src = "../" + appstate.selectedArchive._file._files[0].name + "/" + dirEntry.namespace + "/" + encodedUrl;
-                    return;
-                }
-
-                iframeArticleContent.onload = function () {
-                    var iframeArticleContent = document.getElementById('articleContent');
-                    var iframeContentDocument = iframeArticleContent.contentDocument;
-                    if (!iframeContentDocument && window.location.protocol === 'file:') {
+                var windowLoaded = function() {
+                    articleDocument = articleContainer.document.documentElement;
+                    if (!articleDocument && window.location.protocol === 'file:') {
                         alert("You seem to be opening kiwix-js with the file:// protocol, which is blocked by your browser for security reasons." +
                             "\nThe easiest way to run it is to download and run it as a browser extension (from the vendor store)." +
                             "\nElse you can open it through a web server : either through a local one (http://localhost/...) or through a remote one (but you need SSL : https://webserver/...)" +
@@ -3495,16 +3470,12 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                         return;
                     }
                     // Set a global error handler for iframe
-                    iframeArticleContent.onerror = function (msg, url, line, col, error) {
+                    articleContainer.onerror = function (msg, url, line, col, error) {
                         console.error('Error caught in ZIM contents [' + url + ':' + line + ']:\n' + msg, error);
                         return true;
                     };
 
-                    // Inject the new article's HTML into the iframe
-                    var articleContent = iframeContentDocument.documentElement;
-                    articleContent.innerHTML = htmlArticle;
-
-                    var docBody = iframeContentDocument.getElementsByTagName('body');
+                  var docBody = articleDocument.getElementsByTagName('body');
                     docBody = docBody ? docBody[0] : null;
                     if (docBody) {
                         // Add any missing classes stripped from the <html> tag
@@ -3533,7 +3504,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                                     var refID = obj.target.hash || obj.target.parentNode.hash;
                                     if (!refID) return;
                                     refID = refID.replace(/#/, "");
-                                    var refLocation = iframeContentDocument.getElementById(refID);
+                                    var refLocation = articleDocument.getElementById(refID);
                                     // In some ZIMs the id is in the parent node or in the parent of the parent
                                     var returnID = obj.target.id || obj.target.parentNode.id || obj.target.parentNode.parentNode.id;
                                     // Add backlink to refLocation if missing
@@ -3585,7 +3556,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     var regexpLocalAnchorHref = new RegExp('^(?:#|' + escapedUrl + '#)([^#]*$)');
 
                     // function insertAnchorsJQuery
-                    Array.prototype.slice.call(iframeContentDocument.querySelectorAll('a, area')).forEach(function (anchor) {
+                    Array.prototype.slice.call(articleDocument.querySelectorAll('a, area')).forEach(function (anchor) {
                         // Attempts to access any properties of 'this' with malformed URLs causes app crash in Edge/UWP [kiwix-js #430]
                         try {
                             var testHref = anchor.href;
@@ -3647,21 +3618,62 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     // Make sure the article area is displayed
                     setTab();
                     checkToolbar();
+                    articleDocument.hidden = false;
                 };
 
-                // Load the blank article to clear the iframe (NB iframe onload event runs *after* this)
-                // Electron cannot load this for now (CORS ???)
-                iframeArticleContent.src = "article.html";
+                // For articles loaded in the iframe, we need to set the articleContainer (but if the user is opening a new tab/window,
+                // then the articleContainer has already been set in the click event of the ZIM link)
+                if (appstate.target === 'iframe') {
+                    // Tell jQuery we're removing the iframe document: clears jQuery cache and prevents memory leaks [kiwix-js #361]
+                    $('#articleContent').contents().remove();
+                    articleContainer = document.getElementById('articleContent').contentWindow;
+                    // Ensure the target is permanently stored as a property of the container (since appstate.target can change)
+                    articleContainer.kiwixType = appstate.target;
+                    // Storing the window type at top level window helps us with history manipulation
+                    window.kiwixType = appstate.target;
+                }
 
-                // Hide the articleContent to prevent flashes in dark mode in some browsers
-                // document.getElementById('articleContent').style.display = 'none';
+                if (params.contentInjectionMode === 'serviceworker') {
+                    // Add doctype if missing so that scripts run in standards mode 
+                    // (quirks mode prevents katex from running, and is incompatible with jQuery)
+                    params.transformedHTML = !/^\s*(?:<!DOCTYPE|<\?xml)\s+/i.test(htmlArticle) ? '<!DOCTYPE html>\n' + htmlArticle : htmlArticle;
+                    // We will need the encoded URL on article load so that we can set the iframe's src correctly,
+                    // but we must not encode the '/' character or else relative links may fail [kiwix-js #498]
+                    var encodedUrl = dirEntry.url.replace(/[^/]+/g, function (matchedSubstring) {
+                        return encodeURIComponent(matchedSubstring);
+                    });
+                    // We put the ZIM filename as a prefix in the URL, so that browser caches are separate for each ZIM file
+                    articleContainer.location.href = "../" + appstate.selectedArchive._file._files[0].name + "/" + dirEntry.namespace + "/" + encodedUrl;
+                    return;
+                }
 
-                // var articleContent = iframeArticleContent.contentDocument;
-                // articleContent.open('text/html', 'replace');
-                // articleContent.write("<!DOCTYPE html>"); // Ensures browsers parse iframe in Standards mode
-                // articleContent.write(htmlArticle);
-                // articleContent.close();
-
+                // Calculate the current article's encoded ZIM baseUrl to use when processing relative links
+                baseUrl = (dirEntry.namespace + '/' + dirEntry.url.replace(/[^/]+$/, ''))
+                    // URI-encode anything that is not a '/'
+                    .replace(/[^/]+/g, function(m) {
+                        return encodeURIComponent(m);
+                });
+                // Hide the document to avoid display flash before stylesheets are loaded; also improves performance during loading of
+                // assets in most browsers (the document will be unhidden again by renderIfCSSFulfilled).
+                // DEV: We cannot do `articleContainer.document.documentElement.hidden = true;` because documentElement gets overwritten
+                // during the document.write() process; and since the latter is synchronous, we get slow display rewrites before it is
+                // effective if we do it after document.close().
+                htmlArticle = htmlArticle.replace(/(<html\b[^>]*)>/i, '$1 hidden>');
+                // Write article html to the article container
+                articleContainer.document.open('text/html', 'replace');
+                articleContainer.document.write(htmlArticle);
+                articleContainer.document.close();
+                // Storing the window type at top level window helps us with history manipulation
+                window.kiwixType = appstate.target;
+                if (appstate.target === 'window') articleContainer.onpopstate = historyPop;
+                articleContainer.kiwixType = appstate.target;
+                // IE (and Edge Legacy) do not provide the onload event for newly opened windows/tabs. However, document.write()
+                // followed by document.close() is synchronous in these browsers, so an event loader is unnecessary.
+                if (articleContainer.onload) {
+                    articleContainer.onload = windowLoaded;
+                } else {
+                    windowLoaded();
+                }
             } // End of injectHtml
 
             function insertMediaBlobsJQuery() {
