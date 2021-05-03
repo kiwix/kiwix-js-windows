@@ -190,7 +190,9 @@ define(['uiUtil'], function (uiUtil) {
     }
 
     /**
-     * Prepares an array or collection of image nodes that have been disabled in Service Worker for manual extraction
+     * Prepares the article container in order to process the image nodes that have been disabled in Service Worker
+     * 
+     * @param {Window} container The iframe or the window that contains the document
      * @param {Boolean} forPrinting If true, extracts all images
      */
     function prepareImagesServiceWorker (container, forPrinting) {
@@ -235,6 +237,12 @@ define(['uiUtil'], function (uiUtil) {
         }
     }
 
+    /**
+     * Prepares the article container in order to process the image nodes that have been disabled in the DOM
+     * 
+     * @param {Window} container The iframe or the window that contains the document
+     * @param {Boolean} forPrinting If true, extracts all images
+     */
     function prepareImagesJQuery (container, forPrinting) {
         var doc = container.document;
         var documentImages = doc.querySelectorAll('img[data-kiwixurl]');
@@ -265,7 +273,8 @@ define(['uiUtil'], function (uiUtil) {
     /**
      * Processes an array or collection of image nodes so that they will be lazy loaded (progressive extraction)
      * 
-     * @param {Object} documentImages And array or collection of DOM image nodes which will be processed for 
+     * @param {Window} cont The iframe or window that contains the images
+     * @param {Object} documentImages An array or collection of DOM image nodes which will be processed for 
      *        progressive image extraction 
      */
     function lazyLoad(cont, documentImages) {
