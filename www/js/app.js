@@ -3552,56 +3552,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     // Percent-encode dirEntry.url and add regex escape character \ to the RegExp special characters - see https://www.regular-expressions.info/characters.html;
                     // NB dirEntry.url can also contain path separator / in some ZIMs (Stackexchange). } and ] do not need to be escaped as they have no meaning on their own. 
                     var escapedUrl = encodeURIComponent(dirEntry.url).replace(/([\\$^.|?*+\/()[{])/g, '\\$1');
-                    // Pattern to match a local anchor in an href even if prefixed by escaped url; will also match # on its own
-                    var regexpLocalAnchorHref = new RegExp('^(?:#|' + escapedUrl + '#)([^#]*$)');
-
-                    // function insertAnchorsJQuery
-                    Array.prototype.slice.call(articleDocument.querySelectorAll('a, area')).forEach(function (anchor) {
-                        // Attempts to access any properties of 'this' with malformed URLs causes app crash in Edge/UWP [kiwix-js #430]
-                        try {
-                            var testHref = anchor.href;
-                        } catch (err) {
-                            console.error('Malformed href caused error:' + err.message);
-                            return;
-                        }
-                        var href = anchor.getAttribute('href');
-                        if (href === null || href === undefined) return;
-                        if (href.length === 0) {
-                            // It's a link with an empty href, pointing to the current page: do nothing.
-                        } else if (regexpLocalAnchorHref.test(href)) {
-                            // It's a local anchor link : remove escapedUrl if any (see above)
-                            anchor.setAttribute('href', href.replace(/^[^#]*/, ''));
-                        } else if (anchor.protocol !== currentProtocol ||
-                            anchor.host !== currentHost) {
-                            // It's an external URL : we should open it in a new tab
-                            anchor.target = '_blank';
-                        } else {
-                            // It's a link to an article or file in the ZIM
-                            var uriComponent = uiUtil.removeUrlParameters(href);
-                            var contentType;
-                            var downloadAttrValue;
-                            // Some file types need to be downloaded rather than displayed (e.g. *.epub)
-                            // The HTML download attribute can be Boolean or a string representing the specified filename for saving the file
-                            // For Boolean values, getAttribute can return any of the following: download="" download="download" download="true"
-                            // So we need to test hasAttribute first: see https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute
-                            // However, we cannot rely on the download attribute having been set, so we also need to test for known download file types
-                            var isDownloadableLink = anchor.hasAttribute('download') || regexpDownloadLinks.test(href);
-                            if (isDownloadableLink) {
-                                downloadAttrValue = anchor.getAttribute('download');
-                                // Normalize the value to a true Boolean or a filename string or true if there is no download attribute
-                                downloadAttrValue = /^(download|true|\s*)$/i.test(downloadAttrValue) || downloadAttrValue || true;
-                                contentType = anchor.getAttribute('type');
-                            }
-                            // Add an onclick event to extract this article or file from the ZIM
-                            // instead of following the link
-                            anchor.addEventListener('click', function (e) {
-                                var zimUrl = uiUtil.deriveZimUrlFromRelativeUrl(uriComponent, baseUrl);
-                                goToArticle(zimUrl, downloadAttrValue, contentType);
-                                e.preventDefault();
-                            });
-                        }
-                    });
-
+                    parseAnchorsJQuery();
                     images.prepareImagesJQuery();
                     //loadJavascript(); //Disabled for now, since it does nothing - also, would have to load before images, ideally through controlled css loads above
                     insertMediaBlobsJQuery();
@@ -3675,6 +3626,123 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     windowLoaded();
                 }
             } // End of injectHtml
+
+            function parseAnchorsJQuery() {
+                var currentProtocol = location.protocol;
+                var currentHost = location.host;
+                // Percent-encode dirEntry.url and add regex escape character \ to the RegExp special characters - see https://www.regular-expressions.info/characters.html;
+                // NB dirEntry.url can also contain path separator / in some ZIMs (Stackexchange). } and ] do not need to be escaped as they have no meaning on their own. 
+                var escapedUrl = encodeURIComponent(dirEntry.url).replace(/([\\$^.|?*+/()[{])/g, '\\$1');
+                // Pattern to match a local anchor in an href even if prefixed by escaped url; will also match # on its own
+                var regexpLocalAnchorHref = new RegExp('^(?:#|' + escapedUrl + '#)([^#]*$)');
+                Array.prototype.slice.call(articleDocument.querySelectorAll('a, area')).forEach(function (anchor) {
+                    // Attempts to access any properties of 'this' with malformed URLs causes app crash in Edge/UWP [kiwix-js #430]
+                    try {
+                        var testHref = anchor.href;
+                    } catch (err) {
+                        console.error('Malformed href caused error:' + err.message);
+                        return;
+                    }
+                    var href = anchor.getAttribute('href');
+                    if (href === null || href === undefined) return;
+                    if (href.length === 0) {
+                        // It's a link with an empty href, pointing to the current page: do nothing.
+                    } else if (regexpLocalAnchorHref.test(href)) {
+                        // It's a local anchor link : remove escapedUrl if any (see above)
+                        anchor.setAttribute('href', href.replace(/^[^#]*/, ''));
+                    } else if (anchor.protocol !== currentProtocol ||
+                        anchor.host !== currentHost) {
+                        // It's an external URL : we should open it in a new tab
+                        anchor.target = '_blank';
+                    } else {
+                        // It's a link to an article or file in the ZIM
+                        addListenersToLink(anchor, href);
+                    }
+                });
+                // Add event listeners to the main document so user can open current document in new tab or window
+                addListenersToLink(articleDocument, encodeURIComponent(dirEntry.url.replace(/[^/]+\//g, '')));
+            }
+    
+            /**
+             * Add event listeners to a hyperlinked element to extract the linked article or file from the ZIM instead
+             * of following links
+             * @param {Node} a The anchor or other linked element to which event listeners will be attached
+             * @param {String} href The href of the linked element 
+             */
+            function addListenersToLink(a, href) {
+                var uriComponent = uiUtil.removeUrlParameters(href);
+                var contentType;
+                var downloadAttrValue;
+                // Some file types need to be downloaded rather than displayed (e.g. *.epub)
+                // The HTML download attribute can be Boolean or a string representing the specified filename for saving the file
+                // For Boolean values, getAttribute can return any of the following: download="" download="download" download="true"
+                // So we need to test hasAttribute first: see https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute
+                // However, we cannot rely on the download attribute having been set, so we also need to test for known download file types
+                var isDownloadableLink = a.hasAttribute('download') || regexpDownloadLinks.test(href);
+                if (isDownloadableLink) {
+                    downloadAttrValue = a.getAttribute('download');
+                    // Normalize the value to a true Boolean or a filename string or true if there is no download attribute
+                    downloadAttrValue = /^(download|true|\s*)$/i.test(downloadAttrValue) || downloadAttrValue || true;
+                    contentType = a.getAttribute('type');
+                }
+                // DEV: We need to use the '#' location trick here for cross-browser compatibility with opening a new tab/window
+                a.setAttribute('href', '#');
+                // Store the current values, as they may be changed if user switches to another tab before returning to this one
+                var kiwixTarget = appstate.target;
+                var thisWindow = articleContainer;
+                // Establish a variable for tracking long press
+                var touched = false;
+                a.addEventListener('touchstart', function () {
+                    if (!params.rightClickOpensTab) return;
+                    touched = true;
+                    // The link will be clicked if the user long-presses for more than 600ms (if the option is enabled)
+                    setTimeout(function () {
+                        if (!touched) return;
+                        a.click();
+                    }, 600);
+                }, false);
+                a.addEventListener('touchend', function () {
+                    touched = false;
+                }, false);
+                // This detects right-click in all browsers (only if the option is enabled)
+                a.addEventListener('contextmenu', function (e) {
+                    if (!params.rightClickOpensTab) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    touched = true;
+                    a.click();
+                });
+                // This detects the middle-click event
+                a.addEventListener('mousedown', function (e) {
+                    if (e.which === 2 || e.button === 4) {
+                        e.preventDefault();
+                        touched = true;
+                        a.click();
+                    }
+                });
+                // The main click routine (called by other events above as well)
+                a.addEventListener('click', function (e) {
+                    // Restore original values for this window/tab
+                    appstate.target = kiwixTarget;
+                    articleContainer = thisWindow;
+                    // This detects Ctrl-click, Command-click, the long-press event, and middle-click
+                    if (e.ctrlKey || e.metaKey || touched || e.which === 2 || e.button === 4) {
+                        // We open the new window immediately so that it is a direct result of user action (click)
+                        // and we'll populate it later - this avoids popup blockers
+                        articleContainer = window.open('article.html', '_blank');
+                        appstate.target = 'window';
+                        articleContainer.kiwixType = appstate.target;
+                    } else if (a.tagName === 'HTML') {
+                        // We have registered a click on the document, but a new tab wasn't requested, so ignore
+                        // and allow any propagated clicks on other elements to run 
+                        return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var zimUrl = uiUtil.deriveZimUrlFromRelativeUrl(uriComponent, baseUrl);
+                    goToArticle(zimUrl, downloadAttrValue, contentType);
+                });
+            }
 
             function insertMediaBlobsJQuery() {
                 var iframe = document.getElementById('articleContent').contentDocument;
