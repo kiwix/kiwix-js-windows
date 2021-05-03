@@ -24,9 +24,9 @@
 define(['uiUtil'], function (uiUtil) {
 
     /**
-     * The iframe
+     * The articleContainer (iframe, tab, window)
      */
-    var iframe = document.getElementById('articleContent');
+    var articleContainer;
 
     /**
      * An array to hold all the images in the current document
@@ -203,8 +203,9 @@ define(['uiUtil'], function (uiUtil) {
      * Prepares an array or collection of image nodes that have been disabled in Service Worker for manual extraction
      * @param {Boolean} forPrinting If true, extracts all images
      */
-    function prepareImagesServiceWorker (forPrinting) {
-        var doc = iframe.contentDocument.documentElement;
+    function prepareImagesServiceWorker (container, forPrinting) {
+        articleContainer = container;
+        var doc = articleContainer.document;
         documentImages = doc.querySelectorAll('img');
         // Schedule loadMathJax here in case next line aborts this function
         setTimeout(loadMathJax, 1000);
@@ -241,8 +242,9 @@ define(['uiUtil'], function (uiUtil) {
         }
     }
 
-    function prepareImagesJQuery (forPrinting) {
-        var doc = iframe.contentDocument.documentElement;
+    function prepareImagesJQuery (container, forPrinting) {
+        articleContainer = container;
+        var doc = articleContainer.document;
         documentImages = doc.querySelectorAll('img[data-kiwixurl]');
         // In case there are no images in the doc, we need to schedule the loadMathJax function here
         setTimeout(loadMathJax, 1000);
@@ -280,16 +282,15 @@ define(['uiUtil'], function (uiUtil) {
         });
         if (!documentImages.length) return;
         // There are images remaining, so set up an event listener to load more images once user has stopped scrolling the iframe
-        var iframeWindow = iframe.contentWindow;
         var scrollPos;
         // var rateLimiter = 0;
         var rate = 80; // DEV: Set the milliseconds to wait before allowing another iteration of the image stack
         var timeout;
         // NB we add the event listener this way so we can access it in app.js
-        iframeWindow.onscroll = function () {
+        articleContainer.onscroll = function () {
             abandon = true;
             clearTimeout(timeout);
-            var velo = iframeWindow.pageYOffset - scrollPos;
+            var velo = articleContainer.pageYOffset - scrollPos;
             timeout = setTimeout(function() {
                 // We have stopped scrolling
                 //console.log("Stopped scrolling; velo=" + velo);
@@ -299,13 +300,13 @@ define(['uiUtil'], function (uiUtil) {
                     queueImages('extract', velo >= 0 ? offset : -offset);
                 });
             }, rate);
-            scrollPos = iframeWindow.pageYOffset;
+            scrollPos = articleContainer.pageYOffset;
         };
     }
 
     function loadMathJax() {
         if (!params.useMathJax) return;
-        var doc = iframe.contentDocument;
+        var doc = articleContainer.document;
         var prefix = '';
         if (params.contentInjectionMode === 'serviceworker') {
             params.containsMathSVG = /<img\s+(?=[^>]+?math-fallback-image)[^>]*?alt\s*=\s*['"][^'"]+[^>]+>/i.test(doc.body.innerHTML);
@@ -331,7 +332,7 @@ define(['uiUtil'], function (uiUtil) {
                 script3.type = "text/javascript";
                 script3.src = prefix + "js/katex/contrib/auto-render.min.js";
                 script3.onload = function() {
-                    iframe.contentWindow.renderMathInElement(doc.body, { 
+                    articleContainer.renderMathInElement(doc.body, { 
                         delimiters: [{
                             left: "$$",
                             right: "$$",

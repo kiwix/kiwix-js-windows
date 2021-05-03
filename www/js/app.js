@@ -412,7 +412,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                         btnContinue.innerHTML = "Continue";
                     };
                     if (params.contentInjectionMode == 'jquery') {
-                        images.prepareImagesJQuery(true);
+                        images.prepareImagesJQuery(articleContainer, true);
                     } else {
                         images.prepareImagesServiceWorker(true);
                     }
@@ -3553,7 +3553,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     // NB dirEntry.url can also contain path separator / in some ZIMs (Stackexchange). } and ] do not need to be escaped as they have no meaning on their own. 
                     var escapedUrl = encodeURIComponent(dirEntry.url).replace(/([\\$^.|?*+\/()[{])/g, '\\$1');
                     parseAnchorsJQuery();
-                    images.prepareImagesJQuery();
+                    images.prepareImagesJQuery(articleContainer);
                     //loadJavascript(); //Disabled for now, since it does nothing - also, would have to load before images, ideally through controlled css loads above
                     insertMediaBlobsJQuery();
                     var determinedTheme = params.cssTheme == 'auto' ? cssUIThemeGetOrSet('auto') : params.cssTheme;
@@ -4015,7 +4015,7 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 $('#searchingArticles').show();
                 params.preloadingAllImages = true;
                 if (params.imageDisplay) params.contentInjectionMode == 'jquery' ?
-                    images.prepareImagesJQuery(true) : images.prepareImagesServiceWorker(true);
+                    images.prepareImagesJQuery(articleContainer, true) : images.prepareImagesServiceWorker(true);
                 return;
             }
             // All images should now be loaded, or else user did not request loading images
