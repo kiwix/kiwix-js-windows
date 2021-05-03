@@ -51,12 +51,12 @@ function createWindow() {
 
     //mainWindow.autoHideMenuBar = true;
 
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (!/blob:/i.test(url)) {
-            return { action: 'allow' };
-        }
-        return { action: 'deny' };
-    });
+    // mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    //     if (!/blob:/i.test(url)) {
+    //         return { action: 'allow' };
+    //     }
+    //     return { action: 'deny' };
+    // });
 
     // mainWindow.webContents.on('new-window', function(e, url) {
     //     // Make sure blob urls stay in electron perimeter
