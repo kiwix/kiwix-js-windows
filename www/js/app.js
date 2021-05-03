@@ -2932,9 +2932,10 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 // In ServiceWorker mode, we simply set the iframe or window src.
                 // (reading the backend is handled by the ServiceWorker itself)
                 // var iframe = document.getElementById('articleContent');
-                var articleWindow = appstate.target === 'iframe' ? document.getElementById('articleContent') : window;
+                var articleWindow = appstate.target === 'iframe' ? document.getElementById('articleContent') : articleContainer;
+                var baseUrl = dirEntry.namespace + '/' + dirEntry.url.replace(/[^/]+$/, '');
                 articleWindow.onload = function () {
-                    var articleContainer = articleWindow.contentWindow || articleWindow;
+                    // var articleContainer = articleWindow.contentWindow || articleWindow;
                     // Deflect drag-and-drop of ZIM file on the iframe to Config
                     var doc = articleContainer.document.documentElement;
                     var docBody = doc ? doc.body : null;
@@ -2954,14 +2955,15 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                         listenForSearchKeys();
                         openAllSections();
                         setupHeadings();
+                        parseAnchorsSW();
                         // The content is ready : we can hide the spinner
                         setTab();
                         checkToolbar();
                         // If we reloaded the page to print the desktop style, we need to return to the printIntercept dialogue
                         if (params.printIntercept) printIntercept();
                     }
-
-                    if (/manual|progressive/.test(params.imageDisplayMode)) images.prepareImagesServiceWorker();
+                    
+                    if (/manual|progressive/.test(params.imageDisplayMode)) images.prepareImagesServiceWorker(articleContainer);
 
                     if (params.allowHTMLExtraction) {
                         var determinedTheme = params.cssTheme == 'auto' ? cssUIThemeGetOrSet('auto') : params.cssTheme;
