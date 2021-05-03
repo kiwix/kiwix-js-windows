@@ -133,10 +133,12 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             if (appstate.search.prefix === prefix && !/^(cancelled|complete)$/.test(appstate.search.status)) return;
             $("#welcomeText").hide();
             $('.alert').hide();
-            document.getElementById('searchingArticles').style.display = 'block';
-            pushBrowserHistoryState(null, $('#prefix').val());
+            $("#searchingArticles").show();
+            // Ensure selected search item is displayed in the iframe, not a new window or tab
+            appstate.target = 'iframe';
+            pushBrowserHistoryState(null, prefix);
             // Initiate the search
-            searchDirEntriesFromPrefix($('#prefix').val());
+            searchDirEntriesFromPrefix(prefix);
             clearFindInArticle();
             //Re-enable top-level scrolling
             document.getElementById('scrollbox').style.height = window.innerHeight - document.getElementById('top').getBoundingClientRect().height + 'px';
@@ -530,6 +532,8 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
         });
 
         document.getElementById('btnRandomArticle').addEventListener('click', function () {
+            // In jQuery mode, only load random content in iframe (not tab or window)
+            appstate.target = 'iframe';
             setTab('btnRandomArticle');
             //Re-enable top-level scrolling
             goToRandomArticle();
@@ -642,7 +646,8 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
         });
         // Top menu :
         document.getElementById('btnHome').addEventListener('click', function () {
-            setTab('btnHome');
+            // In jQuery mode, only load landing page in iframe (not tab or window)
+            appstate.target = 'iframe';setTab('btnHome');
             document.getElementById('search-article').scrollTop = 0;
             $('#articleContent').contents().empty();
             $('#searchingArticles').hide();
@@ -2123,6 +2128,9 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 //    cssDirEntryCache = new Map();
                 appstate.selectedArchive = zimArchiveLoader.loadArchiveFromDeviceStorage(selectedStorage, archiveDirectory, function (archive) {
                     settingsStore.setItem("lastSelectedArchive", archiveDirectory, Infinity);
+                    // Ensure that the new ZIM output is initially sent to the iframe (e.g. if the last article was loaded in a window)
+                    // (this only affects jQuery mode)
+                    appstate.target = 'iframe';
                     // The archive is set : go back to home page to start searching
                     if (params.rescan) {
                         document.getElementById('btnConfigure').click();
@@ -2385,6 +2393,9 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
             //if (cssDirEntryCache)
             //    cssDirEntryCache = new Map();
             appstate.selectedArchive = zimArchiveLoader.loadArchiveFromFiles(files, function (archive) {
+                // Ensure that the new ZIM output is initially sent to the iframe (e.g. if the last article was loaded in a window)
+                // (this only affects jQuery mode)
+                appstate.target = 'iframe';
                 // The archive is set : go back to home page to start searching
                 params.storedFile = archive._file._files[0].name;
                 settingsStore.setItem("lastSelectedArchive", params.storedFile, Infinity);
