@@ -2824,8 +2824,8 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 }
             } else {
                 uiUtil.systemAlert('Data files not set');
+            }
         }
-    }
 
         /**
          * Check whether the given URL from given dirEntry equals the expectedArticleURLToBeDisplayed
@@ -2928,61 +2928,59 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                 }
             }
 
-            if (params.contentInjectionMode === 'serviceworker') {
-                // In ServiceWorker mode, we simply set the iframe or window src.
-                // (reading the backend is handled by the ServiceWorker itself)
-                // var iframe = document.getElementById('articleContent');
-                articleDocument = articleWindow.document.documentElement;
-                var articleLoader = articleWindow.frameElement || articleDocument;
-                articleDocument.onloadstart = function () {
-                    var doc = articleWindow.document;
-                    var docBody = doc.body;
-                    if (docBody) {
-                        // Deflect drag-and-drop of ZIM file on the iframe to Config
-                        if (appstate.target === 'iframe') {
-                            docBody.addEventListener('dragover', handleIframeDragover);
-                            docBody.addEventListener('drop', handleIframeDrop);
-                        }
-                        //Set relative font size + Stackexchange-family multiplier
-                        var zimType = /-\/s\/style\.css/i.test(doc.head.innerHTML) ? "desktop" : "mobile";
-                        zimType = /-\/static\/main\.css/i.test(doc.head.innerHTML) ? "desktop-stx" : zimType; //Support stackexchange
-                        zimType = /minerva|mobile[^"']*\.css/i.test(doc.head.innerHTML) ? "mobile" : zimType;
-                        docBody.style.fontSize = ~zimType.indexOf("stx") ? params.relativeFontSize * 1.5 + "%" : params.relativeFontSize + "%";
-                        //Set page width according to user preference
-                        removePageMaxWidth();
-                        setupTableOfContents();
-                        listenForSearchKeys();
-                        openAllSections();
-                        setupHeadings();
-                        // We need to keep tabs on the opened tabs or windows if the user wants right-click functionality
-                        if (params.rightClickOpensTab) parseAnchorsJQuery(dirEntry);
-                        if (/manual|progressive/.test(params.imageDisplayMode)) images.prepareImagesServiceWorker(articleWindow);
-                        if (params.allowHTMLExtraction) {
-                            var determinedTheme = params.cssTheme == 'auto' ? cssUIThemeGetOrSet('auto') : params.cssTheme;
-                            uiUtil.insertBreakoutLink(determinedTheme);
-                        }
-                        // The content is ready : we can hide the spinner
-                        setTab();
-                        checkToolbar();
-                        // If we reloaded the page to print the desktop style, we need to return to the printIntercept dialogue
-                        if (params.printIntercept) printIntercept();
-                    }
-                    
-                    settingsStore.removeItem('lastPageLoad');
-                    $("#searchingArticles").hide();
-                    
-                    // Show spinner when the article unloads
-                    articleLoader.onunload = function () {
-                        $("#searchingArticles").show();
-                    };
-
-                };
-
-                //if (! isDirEntryExpectedToBeDisplayed(dirEntry)) {
-                //    return;
-                //} 
-            }
         }
+
+        var loaded = false;
+        var articleLoadedSW = function (dirEntry) {
+            if (loaded) return;
+            loaded = true;
+            articleDocument = articleWindow.document.documentElement;
+            var doc = articleWindow.document;
+            var docBody = doc.body;
+            if (docBody) {
+                // Deflect drag-and-drop of ZIM file on the iframe to Config
+                if (appstate.target === 'iframe') {
+                    docBody.addEventListener('dragover', handleIframeDragover);
+                    docBody.addEventListener('drop', handleIframeDrop);
+                }
+                //Set relative font size + Stackexchange-family multiplier
+                var zimType = /-\/s\/style\.css/i.test(doc.head.innerHTML) ? "desktop" : "mobile";
+                zimType = /-\/static\/main\.css/i.test(doc.head.innerHTML) ? "desktop-stx" : zimType; //Support stackexchange
+                zimType = /minerva|mobile[^"']*\.css/i.test(doc.head.innerHTML) ? "mobile" : zimType;
+                docBody.style.fontSize = ~zimType.indexOf("stx") ? params.relativeFontSize * 1.5 + "%" : params.relativeFontSize + "%";
+                //Set page width according to user preference
+                removePageMaxWidth();
+                setupTableOfContents();
+                listenForSearchKeys();
+                openAllSections();
+                setupHeadings();
+                // We need to keep tabs on the opened tabs or windows if the user wants right-click functionality
+                if (params.rightClickOpensTab) parseAnchorsJQuery(dirEntry);
+                if (/manual|progressive/.test(params.imageDisplayMode)) images.prepareImagesServiceWorker(articleWindow);
+                if (params.allowHTMLExtraction) {
+                    var determinedTheme = params.cssTheme == 'auto' ? cssUIThemeGetOrSet('auto') : params.cssTheme;
+                    uiUtil.insertBreakoutLink(determinedTheme);
+                }
+                // The content is ready : we can hide the spinner
+                setTab();
+                checkToolbar();
+                articleDocument.bgcolor = '';
+                docBody.hidden = false;
+                // If we reloaded the page to print the desktop style, we need to return to the printIntercept dialogue
+                if (params.printIntercept) printIntercept();
+            }
+            
+            settingsStore.removeItem('lastPageLoad');
+            $("#searchingArticles").hide();
+            
+            // Show spinner when the article unloads
+            articleContainer.onunload = function () {
+                if (articleWindow.kiwixType === 'iframe') {
+                    $("#searchingArticles").show();
+                }
+            };
+
+        };
 
         var messageChannel;
         var maxPageWidthProcessed;
@@ -3039,6 +3037,16 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                                     message.content = params.transformedHTML;
                                     params.transformedHTML = '';
                                     maxPageWidthProcessed = false;
+                                    loaded = false;
+                                    var thisDirEntry = dirEntry;
+                                    articleContainer.onload = function() {
+                                        articleLoadedSW(thisDirEntry);
+                                    };
+                                    // New windows do not respect the onload event because they've been pre-populated,
+                                    // so we have to simulate this event (note potential for race condition if timeout is too short)
+                                    setTimeout(function() {
+                                        if (!loaded) articleLoadedSW(thisDirEntry);
+                                    }, 300);
                                 } else {
                                     // It's an unstransformed html file, so we need to do some content transforms
                                     if (!~params.lastPageVisit.indexOf(dirEntry.url)) params.lastPageVisit = '';
@@ -3580,7 +3588,8 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     // Make sure the article area is displayed
                     setTab();
                     checkToolbar();
-                    articleDocument.hidden = false;
+                    articleDocument.bgcolor = "";
+                    articleWindow.document.body.hidden = false;
                 };
 
                 // For articles loaded in the iframe, we need to set the articleWindow (but if the user is opening a new tab/window,
@@ -3591,6 +3600,14 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     articleWindow = articleContainer.contentWindow;
                 }
 
+                // Hide the document to avoid display flash before stylesheets are loaded; also improves performance during loading of
+                // assets in most browsers (the document will be unhidden again by renderIfCSSFulfilled).
+                // DEV: We cannot do `articleWindow.document.documentElement.hidden = true;` because documentElement gets overwritten
+                // during the document.write() process; and since the latter is synchronous, we get slow display rewrites before it is
+                // effective if we do it after document.close().
+                htmlArticle = htmlArticle.replace(/(<html\b[^>]*)>/i, '$1 bgcolor="black">');
+                htmlArticle = htmlArticle.replace(/(<body\b[^>]*)>/i, '$1 hidden>');
+                
                 if (params.contentInjectionMode === 'serviceworker') {
                     // Add doctype if missing so that scripts run in standards mode 
                     // (quirks mode prevents katex from running, and is incompatible with jQuery)
@@ -3611,12 +3628,6 @@ define(['jquery', 'zimArchiveLoader', 'uiUtil', 'util', 'cache', 'images', 'sett
                     .replace(/[^/]+/g, function(m) {
                         return encodeURIComponent(m);
                 });
-                // Hide the document to avoid display flash before stylesheets are loaded; also improves performance during loading of
-                // assets in most browsers (the document will be unhidden again by renderIfCSSFulfilled).
-                // DEV: We cannot do `articleWindow.document.documentElement.hidden = true;` because documentElement gets overwritten
-                // during the document.write() process; and since the latter is synchronous, we get slow display rewrites before it is
-                // effective if we do it after document.close().
-                htmlArticle = htmlArticle.replace(/(<html\b[^>]*)>/i, '$1 hidden>');
                 // Write article html to the article container
                 articleWindow.document.open('text/html', 'replace');
                 articleWindow.document.write(htmlArticle);

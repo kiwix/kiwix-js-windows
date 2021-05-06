@@ -232,7 +232,7 @@ define(['uiUtil'], function (uiUtil) {
                 // We need to start detecting images after the hidden articleContent has been displayed (otherwise they are not detected)
                 setTimeout(function() {
                     lazyLoad(container, documentImages);
-                }, 100);
+                }, 500);
             }
         }
     }
@@ -263,7 +263,7 @@ define(['uiUtil'], function (uiUtil) {
             // We need to start detecting images after the hidden articleContent has been displayed (otherwise they are not detected)
             setTimeout(function() {
                 lazyLoad(container, documentImages);
-            }, 100);
+            }, 500);
         } else {
             // User wishes to extract images manually
             prepareManualExtraction();
