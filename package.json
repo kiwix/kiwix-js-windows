@@ -1,70 +1,70 @@
 {
-  "name": "kiwix-js-pwa",
-  "productName": "Kiwix JS PWA",
-  "version": "1.4.0",
-  "description": "Kiwix JS PWA packaged for the Electron framework",
-  "main": "main.js",
-  "build": {
-    "appId": "kiwix.js.pwa",
-    "productName": "Kiwix JS PWA",
-    "directories": {
-      "output": "bld/Electron",
-      "buildResources": "bld"
-    },
+  "name": "kiwix_js_windows",
+  "productName": "Kiwix JS Windows",
+  "version": "1.3.0",
+  "description": "Kiwix JS Windows for NWJS",
+  "main": "index.html",
+  "domain": "kiwix.js.windows",
+  "window": {
+    "width": 1280,
+    "height": 960,
+    "min_width": 640,
+    "min_height": 480,
+    "icon": "www/img/icons/kiwix-256.png"
+  },
+  "scripts": {
+    "start": "run --x86 --mirror https://dl.nwjs.io/ .",
+    "dist-win-x86": "build --tasks win-x86 --mirror https://dl.nwjs.io/ .",
+    "dist-win-x64": "build --tasks win-x64 --mirror https://dl.nwjs.io/ .",
+    "dist": "@powershell -NoProfile -ExecutionPolicy Unrestricted -Command ./scripts/Build_NWJS.ps1"
+  },
+  "build-xp": {
+    "nwVersion": "0.14.7",
+    "output": "bld/nwjs/win-x86-xp",
+    "files": [
+      "pwabuilder-sw.js",
+      "index.html",
+      "CHANGELOG.md",
+      "LICENCE",
+      "www/**",
+      "archives/README.md",
+      "archives/wikip*.*"
+    ],
     "afterPack": "./scripts/appimage-fix.js",
     "win": {
-      "target": [
-        {
-          "target": "NSIS",
-          "arch": "ia32"
-        }
-      ]
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
-        }
-      ],
-      "category": "Education"
-    },
-    "nsis": {
-      "oneClick": "false",
-      "allowElevation": "true",
-      "runAfterFinish": "true"
-    },
-    "asar": false,
+      "icon": "www/img/icons/kiwix-64.ico"
+    }
+  },
+  "build-x64": {
+    "nwVersion": "0.53.1",
+    "output": "bld/nwjs/win-x64",
     "files": [
       "archives/**",
       "pwabuilder-sw.js",
       "index.html",
       "CHANGELOG.md",
       "LICENCE",
-      "www/**",
-      "preload.js",
-      "main.js"
-    ]
+      "www/**"
+    ],
+    "win": {
+      "icon": "www/img/icons/kiwix-64.ico"
+    }
   },
-  "scripts": {
-    "start": "electron .",
-    "dist-win": "electron-builder build --win",
-    "dist-linux": "electron-builder build --linux",
-    "package-mac": "electron-packager . kiwix-js-windows --overwrite --platform=darwin --arch=x64 --icon=assets/icons/mac/icon.icns --prune=true --out=release-builds",
-    "package-win": "electron-packager . kiwix-js-windows --electron-version='10.4.0' --ignore=archives --ignore=AppPackages --ignore=BundleArtifacts --ignore=images$ --ignore=bin$ --ignore=bld$ --ignore=KiwixWebApp.* --ignore=[pP]ackage.[aSl] --ignore=node_ --ignore=[.]git[hi][ug][bn] --ignore=[.]vs$ --ignore=vscode --overwrite --platform=win32 --arch=ia32 --icon=www/img/icons/kiwix-64.ico --prune=true --out=bld/electron --version-string.CompanyName=Kiwix --version-string.FileDescription='Kiwix JS ZIM File Reader' --version-string.ProductName='Kiwix JS Windows Electron Edition'",
-    "postpackage-win": "(robocopy archives bld\\Electron\\kiwix-js-windows-win32-ia32\\resources\\app\\archives\\ > null) ^& IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0",
-    "package-linux": "electron-packager . kiwix-js-windows --overwrite --platform=linux --icon=www/img/icons/kiwix-64.png --electron-version='10.4.0' --ignore=archives --ignore=AppPackages --ignore=BundleArtifacts --ignore=images$ --ignore=bin$ --ignore=bld$ --ignore=KiwixWebApp.* --ignore=[pP]ackage.[aSl] --ignore=node_ --ignore=[.]git[hi][ug][bn] --ignore=[.]vs$ --ignore=vscode --overwrite --arch=x64 --prune=true --out=bld/electron --version-string.CompanyName=Kiwix --version-string.FileDescription='Kiwix JS ZIM File Reader' --version-string.ProductName='Kiwix JS Windows Electron Edition'",
-    "postpackage-linux": "(robocopy archives bld\\Electron\\kiwix-js-windows-linux-x64\\archives\\ > null) ^& IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0"
+  "build": {
+    "nwVersion": "0.53.1",
+    "output": "bld/nwjs/win-x86",
+    "files": [
+      "pwabuilder-sw.js",
+      "index.html",
+      "CHANGELOG.md",
+      "LICENCE",
+      "www/**",
+      "archives/README.md",
+      "archives/wikip*.*"
+    ],
+    "win": {
+      "icon": "www/img/icons/kiwix-64.ico"
+    }
   },
   "repository": "https://github.com/kiwix/kiwix-js-windows",
   "keywords": [
@@ -81,13 +81,10 @@
   "maintainer": "Jaifroid",
   "license": "CC0-1.0",
   "devDependencies": {
-    "electron": "10.4.0",
-    "electron-builder": "^22.10.5",
-    "electron-packager": "^15.2.0"
+    "nwjs-builder-phoenix": "^1.15.0"
   },
   "dependencies": {
     "@types/fs-extra": "^9.0.11"
   }
 }
-
 
